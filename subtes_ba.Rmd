@@ -1,0 +1,298 @@
+---
+title: "R Notebook"
+output:
+  html_document: default
+  html_notebook: default
+  pdf_document: default
+---
+```{r}
+library(shiny)
+library(shinydashboard)
+library(ggmap)
+library(ggplot2)
+library(data.table)
+library(plotly)
+library(waffle)
+library(ggthemes)
+library(extrafont)
+library(rsconnect)
+```
+
+
+##Periodo analizado
+Se analiza el periodo  Novimebre 2017 - Junio 2017 por mantenerse constante el precio del boleto en $7,50
+
+##Mapa Estaciones de subte
+
+```{r}
+#setwd("~/Documents/Visualizacion")
+estaciones <- read.csv('estaciones-de-subte.csv', header = TRUE)
+```
+
+```{r}
+map.bs.as <- get_map( location = "Buenos Aires"
+                , zoom = 12
+                , maptype = "terrain"
+                , color = "bw" 
+)
+```
+
+```{r}
+cols <- c("D" = "chartreuse4", "B" = "red", "C" = "blue", "H" = "darkgoldenrod1" , 'A' = "cornflowerblue", 'E' = 'blueviolet')
+```
+
+```{r}
+colors <- c("LINEA_D" = "chartreuse4", "LINEA_B" = "red", "LINEA_C" = "blue", "LINEA_H" = "darkgoldenrod1" , 'LINEA_A' = "cornflowerblue", 'LINEA_E' = 'blueviolet')
+```
+
+#Plot 2: Ubicacion geografica de las estaciones
+```{r}
+p <- ggmap(map.bs.as) +
+      geom_point(data = estaciones ,
+                    aes(x = X, y = Y,
+                    colour = factor (LINEA))) +
+      scale_colour_manual(values = cols) +
+      theme(
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.text.x = element_blank(),
+      axis.text.y = element_blank(),
+      legend.title = element_text("LINEAS"))
+p
+```
+
+```{r}
+#molinetes.2017 <- fread("molinetes_historico.csv")
+```
+
+```{r}
+#head(molinetes.2017)
+```
+
+```{r}
+#molinetes.2017.estacion.hs <- molinetes.2017[, .(prom = round(mean(TOTAL))), by = list(LINEA,ESTACION, DESDE,ID)]
+```
+
+
+```{r}
+#unique(filter(molinetes.2017.estacion.hs, LINEA == 'LINEA_D')$ESTACION)
+```
+
+#Plot 3: Latido de estaciones
+```{r}
+#molinetes.2017.estacion.hs <- molinetes.2017.estacion.hs[estaciones, on = 'ID']
+```
+
+```{r}
+#write.table(molinetes.2017.estacion.hs, "molinetes_2017_estacion_hs.csv", sep =",", col.names = TRUE, row.names = #FALSE)
+```
+
+```{r}
+molinetes.2017.estacion.hs <- read.table(file = "molinetes_2017_estacion_hs.csv", sep = ",", header = TRUE)
+```
+
+
+```{r}
+ax <- list(
+  title = "",
+  zeroline = FALSE,
+  showline = FALSE,
+  showticklabels = FALSE,
+  showgrid = FALSE
+)
+```
+
+
+```{r}
+p <- plot_ly(
+    data = molinetes.2017.estacion.hs,
+    x = ~ X, 
+    y =  ~ Y, 
+    size = ~ prom,
+    color = ~ LINEA, 
+    colors = ~ colors,
+    frame = ~ DESDE, 
+    text = ~ESTACION, 
+    hoverinfo = "text",
+    type = 'scatter',
+    mode = 'markers'
+  ) 
+
+p <- layout(p,
+            xaxis=ax,
+            yaxis=ax)
+p <- animation_opts(p, frame = 100)
+p
+```
+
+
+# Plot 4: Densidad pasajeros por estacion
+```{r}
+q <- plot_ly(
+    data = molinetes.2017.estacion.hs,
+    x = ~ prom, 
+    y =  ~ ESTACION, 
+    size = ~ prom, 
+    color = ~ LINEA, 
+    colors = ~ colors,
+    frame = ~ DESDE, 
+    text = ~ESTACION, 
+    hoverinfo = "text",
+    type = 'scatter',
+    mode = 'markers'
+  ) 
+
+q <- layout(q,
+            xaxis=list(
+            showline = FALSE,
+            showgrid = FALSE,
+            title = 'Cantidad de personas promedio'
+            ),
+            yaxis = list(showgrid = FALSE, title = F),
+            font = list(family = "sans serif", size = 8, color = "grey")
+            )
+q <- q %>%
+  animation_slider(currentvalue = list( font = list(color="red")))
+q
+```
+
+
+#Plot 4: Waffle Chart
+```{r}
+#molinetes.2017.cant.pasajeros <- molinetes.2017[, .(sum(TOTAL)), by = PERIODO]
+```
+
+```{r}
+#molinetes.2017.cant.pasajeros.linea <- molinetes.2017[, .(cant = sum(TOTAL)), by = LINEA]
+```
+
+```{r}
+#molinetes.2017.avg.linea <- molinetes.2017[, .(avg = round(mean(TOTAL))), by = LINEA]
+```
+
+```{r}
+#write.table(molinetes.2017.avg.linea, "molinetes_2017_avg_linea.csv", sep =",", col.names = TRUE, row.names = #FALSE)
+```
+
+```{r}
+molinetes.2017.avg.linea <- read.table(file = "molinetes_2017_avg_linea.csv", sep = ",", header = TRUE)
+```
+
+```{r}
+vals = as.vector(unlist (round(molinetes.2017.avg.linea[,"avg"]), use.names = TRUE))
+names (vals) = unlist (molinetes.2017.avg.linea[,"LINEA"], use.names = FALSE)
+```
+
+
+use_glyph = 'user', glyph_size = 5,
+
+```{r}
+waffle(vals , rows = 5, colors = colors , size = 0.5, xlab = "1 icono == 1 persona", legend_pos = "down")
+```
+
+#Shiny Dashboard
+
+```{r}
+skin <- "yellow"
+header <-  dashboardHeader(title = span(tagList(icon("subway", lib ="font-awesome"), 
+                          "SUBTES Ciudad de Buenos Aires - Maria Ines Aran")),
+                          titleWidth = 550)
+sidebar <- dashboardSidebar(disable = TRUE)
+                            
+body <- dashboardBody(
+                      
+                      fluidRow(box(h4("Analisis de cantidad de pasajeros que ingresan a las estaciones de subte de la Ciudad de Buenos Aires en el periodo Enero a Septiembre 2017. Basado en datos publicados por https://data.buenosaires.gob.ar/
+"),
+                                   width = 12)),
+                      fluidRow(box(h6("Trabajo final de la materia Visualizacion - Esp. Cs. de datos del ITBA - Maria Ines Aran"),
+                                   width = 12)),
+                      fluidRow(
+                               box(title = "Ubicacion geografica de lineas de subte de Ciudad de Buenos Aires",
+                                  background = "yellow",
+                                  plotOutput("plot2")),
+                               box(title = "Pasajeros por linea",
+                                   "Cantidad de pasajeros promedio por linea de subtes de Ciudad de Buenos Aires   durante 2017",
+                                   background = "yellow",
+                                   width = 6,
+                                   solidHeader = TRUE,
+                                   plotOutput("plot1", height = 250))),
+                      fluidRow(
+                              box( title = "Densidad de pasajeros por horario (Play!)",
+                                   background = "yellow",
+                                   status = "warning",
+                                   width = 12,
+                                   plotlyOutput("plot4", height = 1000),verbatimTextOutput("event")))
+                      
+                      )
+                
+```
+
+#Shiny App
+```{r}
+ui <- dashboardPage(
+      header,
+      sidebar,
+      body,
+      skin = skin)
+
+server <- function(input, output) {
+  #Plot 1
+  output$plot1 <- renderPlot({
+    waffle(vals , rows = 5, colors = colors , size = 0.5, xlab = "1 icono == 1 persona", legend_pos = "down")
+  })
+  #Plot 2
+  output$plot2 <- renderPlot({
+    ggmap(map.bs.as) +
+      geom_point(data = estaciones ,
+                    aes(x = X, y = Y,
+                    colour = factor (LINEA))) +
+      scale_colour_manual(values = cols) +
+      theme(
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.text.x = element_blank(),
+      axis.text.y = element_blank(),
+      legend.title = element_text("LINEAS"))
+  })
+  #Plot 4
+  output$plot4 <- renderPlotly({
+    q <- plot_ly(
+    data = molinetes.2017.estacion.hs,
+    x = ~ prom, 
+    y =  ~ ESTACION, 
+    size = ~ prom, 
+    color = ~ LINEA, 
+    colors = ~ colors,
+    frame = ~ DESDE, 
+    text = ~ESTACION, 
+    hoverinfo = "text",
+    type = 'scatter',
+    mode = 'markers'
+  ) 
+
+q <- layout(q,
+            xaxis=list(
+            showline = FALSE,
+            showgrid = FALSE,
+            title = 'Cantidad de personas promedio'
+            ),
+            yaxis = list(showgrid = FALSE, title = F),
+            font = list(family = "sans serif", size = 8, color = "grey")
+            )
+q <- q %>%
+  animation_slider(currentvalue = list( font = list(color="red")))    
+  })
+  
+  
+}
+
+options(shiny.sanitize.errors = TRUE)
+
+shinyApp(ui, server)
+```
+
+
